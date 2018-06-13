@@ -319,14 +319,20 @@ class Utils {
         if(e) {
           reject(e);
         } else {
-          resolve(d.db());
+          const db = d.db();
+          db.close = d.close;
+          resolve(db);
         }
       });
     });
   }
 
-  static initialLogger({ homeFolder }) {
-    return Promise.resolve(log4js.getLogger());
+  static initialLogger({ homeFolder, base }) {
+    return Promise.resolve({
+      log: console.log,
+      debug: base.debug ? console.log : () => {},
+      trace: console.trace
+    });
   }
 
   static initiali18n() {
@@ -348,7 +354,14 @@ class Utils {
   }
 
   static startBots({ Bots }) {
-    return Promise.all(Bots.map((bot) => bot.start()));
+    return Promise.all(Bots.map((bot) => bot.start()))
+    .then(() => Bots );
+  }
+
+  static close({ Bots }) {
+    const database = Bots[0].database;
+    database.mongodb.close();
+    database.leveldb.close();
   }
 }
 

@@ -3,19 +3,20 @@
 title = "BlockScanner"
 
 [base]
-folder = "GO"
+folder = "chaindata"
+debug = false
 
 [blockchain]
 protocol = "http:"
-hostname = "52.74.128.226"
+hostname = "127.0.0.1"
 port = 8545
 path = "/"
 
 [database]
 protocol = "mongodb:"
-hostname = "13.57.208.60"
-port = 27056
-db = "STAGINGXPAEX"
+hostname = "127.0.0.1"
+port = 27012
+db = "CHAINDATA"
 prefix = "BS_"
-user = "STAGINGXPAEX"
-password = "STAGINGPASSWORD"
+user = "BC2"
+password = "password"

@@ -65,8 +65,8 @@ Utils.readConfig({ configPath: cfg })
     Utils.initialAll(argv)
     .then((options) => Utils.initialBots(options))
     .then((Bots) => Utils.startBots({ Bots }))
-    .catch((e) => { console.trace(e); });
+    .catch((e) => { console.trace(e); })
+    .then((Bots) => Utils.close({ Bots }));
   }
-
 })
 
