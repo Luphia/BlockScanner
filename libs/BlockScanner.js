@@ -50,7 +50,9 @@ class BlockScanner extends Bot {
     .then((block) => { return this.finishCurrentBlock(block); })
     .then(() => this.fetchNextBlock())
     .catch((e) => new Promise((resolve, reject) => {
-      this.logger.trace(e);
+      if(e) {
+        this.logger.trace(e);
+      }
       setTimeout(() => {
         this.fetchNextBlock()
         .then(resolve, reject);
@@ -93,8 +95,8 @@ class BlockScanner extends Bot {
         block.timestamp = parseInt(block.timestamp);
         return Promise.resolve({ block });
       } else {
-        this.logger.log(`\x1b[1m\x1b[32mblock not found\x1b[0m\x1b[21m ${block}`);
-        return Promise.reject(data.result)
+        this.logger.log(`\x1b[1m\x1b[35mblock not found\x1b[0m\x1b[21m ${block}`);
+        return Promise.reject()
       }
     });
   }
@@ -161,7 +163,7 @@ class BlockScanner extends Bot {
         return Promise.resolve(data.result);
       } else {
         this.logger.log(`\x1b[1m\x1b[35mtransaction not found\x1b[0m\x1b[21m ${txHash}`);
-        return Promise.reject(data.result);
+        return Promise.reject();
       }
     });
   }
@@ -285,7 +287,7 @@ class BlockScanner extends Bot {
         return Promise.resolve(data.result);
       } else {
         this.logger.log(`\x1b[1m\x1b[35mtransaction not found\x1b[0m\x1b[21m ${txHash}`);
-        return Promise.reject(data.result);
+        return Promise.reject();
       }
     })
     .then(() => Promise.resolve(true))
