@@ -4,7 +4,7 @@ title = "BlockScanner"
 
 [base]
 folder = "chaindata"
-debug = true
+debug = false
 
 [blockchain]
 protocol = "http:"

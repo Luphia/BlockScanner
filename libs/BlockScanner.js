@@ -88,7 +88,10 @@ class BlockScanner extends Bot {
     return Utils.ETHRPC(options)
     .then((data) => {
       if(data.result instanceof Object) {
-        return Promise.resolve({ block: data.result });
+        const block = data.result;
+        block.number = parseInt(block.number);
+        block.timestamp = parseInt(block.timestamp);
+        return Promise.resolve({ block });
       } else {
         this.logger.log(`\x1b[1m\x1b[32mblock not found\x1b[0m\x1b[21m ${block}`);
         return Promise.reject(data.result)
