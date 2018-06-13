@@ -1,0 +1,36 @@
+{
+  "name": "blockscanner",
+  "version": "0.1.0",
+  "description": "Blockchain Data Collector",
+  "main": "bin/start.js",
+  "bin": {
+    "blockscanner": "bin/start.js"
+  },
+  "scripts": {
+    "test": "bin/test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Luphia/BlockScanner.git"
+  },
+  "keywords": [
+    "blockchain",
+    "crawler"
+  ],
+  "author": "Luphia Chang",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Luphia/BlockScanner/issues"
+  },
+  "homepage": "https://github.com/Luphia/BlockScanner#readme",
+  "dependencies": {
+    "command-line-args": "^5.0.2",
+    "dvalue": "^1.0.20",
+    "ecrequest": "^1.1.3",
+    "i18n": "^0.8.3",
+    "level": "^4.0.0",
+    "log4js": "^2.8.0",
+    "mongodb": "^3.0.10",
+    "toml": "^2.3.3"
+  }
+}

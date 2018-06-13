@@ -1,0 +1,21 @@
+# BlockScanner Default Config
+
+title = "BlockScanner"
+
+[base]
+folder = "GO"
+
+[blockchain]
+protocol = "http:"
+hostname = "52.74.128.226"
+port = 8545
+path = "/"
+
+[database]
+protocol = "mongodb:"
+hostname = "13.57.208.60"
+port = 27056
+db = "STAGINGXPAEX"
+prefix = "BS_"
+user = "STAGINGXPAEX"
+password = "STAGINGPASSWORD"
