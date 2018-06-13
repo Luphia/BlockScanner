@@ -1,10 +1,10 @@
 {
-  "name": "blockscanner",
+  "name": "bc2",
   "version": "0.1.0",
   "description": "Blockchain Data Collector",
   "main": "bin/start.js",
   "bin": {
-    "blockscanner": "bin/start.js"
+    "bc2": "bin/start.js"
   },
   "scripts": {
     "test": "bin/test.js"

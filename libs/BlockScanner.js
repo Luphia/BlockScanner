@@ -13,16 +13,15 @@ class BlockScanner extends Bot {
   }
 
   start() {
-  	this.currentBlock = (this.config.argv.from - 1);
-  	this.only = this.config.argv.only || -1;
-  	this.freezeIndex = this.only > -1;
+    this.currentBlock = (this.config.argv.from - 1);
+    this.only = this.config.argv.only || -1;
+    this.freezeIndex = this.only > -1;
     return super.start()
     .then(() => this.scan())
-    .catch(console.trace);
+    .catch(this.logger.trace);
   }
 
   scan() {
-  	console.log(`--- start ---`)
     return this.fetchNextBlock();
   }
 
@@ -42,6 +41,7 @@ class BlockScanner extends Bot {
     // 5. put BlockNumber
     // 6. again
 
+    this.initialRound = new Date().getTime();
     return Utils.retryPromise(this.getCurrentBlock, [], 3, this)
     .then((block) => { return { block: block + 1 }; })
     .then((block) => { return this.getBlock(block); })
@@ -50,7 +50,7 @@ class BlockScanner extends Bot {
     .then((block) => { return this.finishCurrentBlock(block); })
     .then(() => this.fetchNextBlock())
     .catch((e) => new Promise((resolve, reject) => {
-      console.trace(e);
+      this.logger.trace(e);
       setTimeout(() => {
         this.fetchNextBlock()
         .then(resolve, reject);
@@ -59,9 +59,9 @@ class BlockScanner extends Bot {
   }
 
   getCurrentBlock() {
-  	if(this.currentBlock > -1) {
+    if(this.currentBlock >= -1) {
       return Promise.resolve(this.currentBlock);
-  	} else {
+    } else {
       return this.database.leveldb.get('BlockNumber')
       .then((block) => parseInt(block))
       .then((block) => this.BlockNumber = block > -1 ? block : -1)
@@ -70,10 +70,11 @@ class BlockScanner extends Bot {
   }
 
   finishCurrentBlock({ block }) {
-  	const blockNumber = parseInt(block.number);
-  	this.currentBlock ++;
-  	if(this.only > 0) { this.only--; }
-  	console.log(`\x1b[1m\x1b[35mend of Block\x1b[0m\x1b[21m ${blockNumber}`);
+    const blockNumber = parseInt(block.number);
+    const timeCost = Utils.parseTime(this.initialRound);
+    this.currentBlock ++;
+    if(this.only > 0) { this.only--; }
+    this.logger.log(`\x1b[1m\x1b[35mend of Block\x1b[0m\x1b[21m ${blockNumber} (${timeCost})`);
     return this.freezeIndex ?
       Promise.resolve(block) :
       this.database.leveldb.put('BlockNumber', blockNumber)
@@ -89,14 +90,14 @@ class BlockScanner extends Bot {
       if(data.result instanceof Object) {
         return Promise.resolve({ block: data.result });
       } else {
-        console.log(`\x1b[1m\x1b[32mblock not found\x1b[0m\x1b[21m ${block}`);
+        this.logger.log(`\x1b[1m\x1b[32mblock not found\x1b[0m\x1b[21m ${block}`);
         return Promise.reject(data.result)
       }
     });
   }
 
   putBlock({ block }) {
-  	console.log(`\x1b[1m\x1b[32mBlock\x1b[0m\x1b[21m ${block.hash}`);
+    this.logger.debug(`\x1b[1m\x1b[32mBlock\x1b[0m\x1b[21m ${block.hash}`);
 
     const mongodb = this.database.mongodb;
     const tableName = `${this.config.database.prefix}Blocks`;
@@ -122,6 +123,7 @@ class BlockScanner extends Bot {
   fetchTransactions({ block }) {
     const txHashes = block.transactions;
     const timestamp = block.timestamp;
+    /*
     return txHashes.reduce((prev, curr) => {
       return prev.then((list) => 
         this.getTransaction({ txHash: curr })
@@ -134,6 +136,15 @@ class BlockScanner extends Bot {
         })
       );
     }, Promise.resolve([]))
+    */
+    return Promise.all(txHashes.map((v) => {
+      return this.getTransaction({ txHash: v })
+      .then((tx) => {
+        const newTx = tx;
+        newTx.timestamp = timestamp;
+        return this.putTransaction({ transaction: newTx });
+      })
+    }))
     .then(() => Promise.resolve({ block }));
   }
 
@@ -144,16 +155,16 @@ class BlockScanner extends Bot {
     return Utils.ETHRPC(options)
     .then((data) => {
       if(data.result instanceof Object) {
-      	return Promise.resolve(data.result);
+        return Promise.resolve(data.result);
       } else {
-        console.log(`\x1b[1m\x1b[35mtransaction not found\x1b[0m\x1b[21m ${txHash}`);
+        this.logger.log(`\x1b[1m\x1b[35mtransaction not found\x1b[0m\x1b[21m ${txHash}`);
         return Promise.reject(data.result);
       }
     });
   }
 
   putTransaction({ transaction }) {
-    console.log(`\x1b[1m\x1b[32mTransaction\x1b[0m\x1b[21m ${transaction.transactionHash}`);
+    this.logger.debug(`\x1b[1m\x1b[32mTransaction\x1b[0m\x1b[21m ${transaction.transactionHash}`);
 
     const condition = { transactionHash: transaction.transactionHash };
     const mongodb = this.database.mongodb;
@@ -183,16 +194,16 @@ class BlockScanner extends Bot {
 
   putEvent({ logs, timestamp }) {
     if(logs instanceof Array) {
-      return Utils.waterfallPromise(logs.map((log) => () => this.putEvent({ logs: log, timestamp })));
+      return Promise.all(logs.map((log) => this.putEvent({ logs: log, timestamp })));
     } else {
-      console.log(`  \x1b[1m\x1b[36mEvent\x1b[0m\x1b[21m ${logs.logIndex} - ${logs.topics[0] || logs.topics}`);
+      this.logger.debug(`  \x1b[1m\x1b[36mEvent\x1b[0m\x1b[21m ${logs.logIndex} - ${logs.topics[0] || logs.topics}`);
 
       const log = logs;
       log.timestamp = timestamp;
 
       const condition = {
-      	transactionHash: log.transactionHash,
-      	logIndex: log.logIndex
+        transactionHash: log.transactionHash,
+        logIndex: log.logIndex
       };
       const mongodb = this.database.mongodb;
       const tableName = `${this.config.database.prefix}Events`;
@@ -216,19 +227,19 @@ class BlockScanner extends Bot {
   }
 
   putContract({
-  	blockHash,
-  	blockNumber,
-  	contractAddress,
-  	cumulativeGasUsed,
-  	from,
-  	gasUsed,
-  	status,
-  	to,
-  	transactionHash,
-  	timestamp
+    blockHash,
+    blockNumber,
+    contractAddress,
+    cumulativeGasUsed,
+    from,
+    gasUsed,
+    status,
+    to,
+    transactionHash,
+    timestamp
   }) {
-  	if(!contractAddress) { return Promise.resolve({}); }
-    console.log(`\x1b[1m\x1b[32mContract\x1b[0m\x1b[21m ${contractAddress}`);
+    if(!contractAddress) { return Promise.resolve({}); }
+    this.logger.log(`\x1b[1m\x1b[32mContract\x1b[0m\x1b[21m ${contractAddress}`);
     const condition = { contractAddress };
     const contract = {
       blockHash,
@@ -268,9 +279,9 @@ class BlockScanner extends Bot {
     return Utils.ETHRPC(options)
     .then((data) => {
       if(data.result instanceof Object) {
-      	return Promise.resolve(data.result);
+        return Promise.resolve(data.result);
       } else {
-        console.log(`\x1b[1m\x1b[35mtransaction not found\x1b[0m\x1b[21m ${txHash}`);
+        this.logger.log(`\x1b[1m\x1b[35mtransaction not found\x1b[0m\x1b[21m ${txHash}`);
         return Promise.reject(data.result);
       }
     })
