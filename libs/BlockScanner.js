@@ -74,9 +74,10 @@ class BlockScanner extends Bot {
   finishCurrentBlock({ block }) {
     const blockNumber = parseInt(block.number);
     const timeCost = Utils.parseTime(this.initialRound);
+    const txs = (block.transactions.length) + (block.transactions.length > 1 ? ' TXs' : ' TX');
     this.currentBlock ++;
     if(this.only > 0) { this.only--; }
-    this.logger.log(`\x1b[1m\x1b[35mend of Block\x1b[0m\x1b[21m ${blockNumber} (${timeCost})`);
+    this.logger.log(`\x1b[1m\x1b[35mend of Block\x1b[0m\x1b[21m ${blockNumber} | ${timeCost} | ${txs}`);
     return this.freezeIndex ?
       Promise.resolve(block) :
       this.database.leveldb.put('BlockNumber', blockNumber)
@@ -95,7 +96,7 @@ class BlockScanner extends Bot {
         block.timestamp = parseInt(block.timestamp);
         return Promise.resolve({ block });
       } else {
-        this.logger.log(`\x1b[1m\x1b[35mblock not found\x1b[0m\x1b[21m ${block}`);
+        this.logger.log(`\x1b[1m\x1b[90mblock not found\x1b[0m\x1b[21m ${block}`);
         return Promise.reject()
       }
     });
@@ -105,6 +106,7 @@ class BlockScanner extends Bot {
     this.logger.debug(`\x1b[1m\x1b[32mBlock\x1b[0m\x1b[21m ${block.hash}`);
 
     const mongodb = this.database.mongodb;
+    const leveldb = this.database.leveldb;
     const tableName = `${this.config.database.prefix}Blocks`;
     const condition = { hash: block.hash };
 
@@ -122,7 +124,8 @@ class BlockScanner extends Bot {
             }
           }
       )}) :
-      Promise.resolve({ block });
+      leveldb.put(`block.${block.hash}`, block)
+      .then(() => Promise.resolve({ block }));
   }
 
   fetchTransactions({ block }) {
@@ -162,7 +165,7 @@ class BlockScanner extends Bot {
       if(data.result instanceof Object) {
         return Promise.resolve(data.result);
       } else {
-        this.logger.log(`\x1b[1m\x1b[35mtransaction not found\x1b[0m\x1b[21m ${txHash}`);
+        this.logger.log(`\x1b[1m\x1b[90mtransaction not found\x1b[0m\x1b[21m ${txHash}`);
         return Promise.reject();
       }
     });
@@ -173,6 +176,7 @@ class BlockScanner extends Bot {
 
     const condition = { transactionHash: transaction.transactionHash };
     const mongodb = this.database.mongodb;
+    const leveldb = this.database.leveldb;
     const tableName = `${this.config.database.prefix}Transcations`;
     return Promise.all([
       this.putEvent(transaction),
@@ -193,7 +197,8 @@ class BlockScanner extends Bot {
               }
             }
         )}) :
-        Promise.resolve({ transaction });
+        leveldb.put(`transaction.${transaction.transactionHash}`, transaction)
+        then(() => Promise.resolve({ transaction }));
     });
   }
 
@@ -211,6 +216,7 @@ class BlockScanner extends Bot {
         logIndex: log.logIndex
       };
       const mongodb = this.database.mongodb;
+      const leveldb = this.database.leveldb;
       const tableName = `${this.config.database.prefix}Events`;
 
       return mongodb ? 
@@ -227,7 +233,8 @@ class BlockScanner extends Bot {
               }
             }
         )}) :
-        Promise.resolve({ logs });
+        leveldb.put(`event.${log.transactionHash}.${log.logIndex}`, log)
+        .then(() => Promise.resolve({ logs }));
     }
   }
 
@@ -259,6 +266,7 @@ class BlockScanner extends Bot {
       timestamp
     };
     const mongodb = this.database.mongodb;
+    const leveldb = this.database.leveldb;
     const tableName = `${this.config.database.prefix}Contracts`;
     return mongodb ?
     new Promise((resolve, reject) => {
@@ -274,7 +282,8 @@ class BlockScanner extends Bot {
           }
         }
       )}) :
-      Promise.resolve({ contract });
+      leveldb.put(`contract.${contractAddress}`, contract)
+      .then(() => Promise.resolve({ contract }));
   }
 
   putInternalTranction({ transactionHash }) {
@@ -286,7 +295,7 @@ class BlockScanner extends Bot {
       if(data.result instanceof Object) {
         return Promise.resolve(data.result);
       } else {
-        this.logger.log(`\x1b[1m\x1b[35mtransaction not found\x1b[0m\x1b[21m ${txHash}`);
+        this.logger.log(`\x1b[1m\x1b[90mtransaction not found\x1b[0m\x1b[21m ${txHash}`);
         return Promise.reject();
       }
     })

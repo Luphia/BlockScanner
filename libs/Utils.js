@@ -6,7 +6,6 @@ const url = require('url');
 const level = require('level');
 const mongodb = require('mongodb').MongoClient;
 const toml = require('toml');
-const log4js = require('log4js');
 const i18n = require("i18n");
 const dvalue = require('dvalue');
 const ecRequest = require('ecrequest');
@@ -172,38 +171,14 @@ class Utils {
       this.scanFolder({ folder: PIDFolder })
       .then((list) => {
         const jobs = list
+        .map((v) => parseInt(path.parse(v).name))
+        .filter((v) => v > -1)
         .sort((a, b) => {
-          return parseInt(path.parse(a).name) > parseInt(path.parse(b).name) ?
+          return a > b ?
             1 :
             -1 ;
         })
-        .map((PFile, i) => {
-          const index = this.zeroFill(i, 3);
-          return new Promise((resolve, reject) => {
-            fs.readFile(PFile, (e, d) => {
-              if(e) {
-                reject(e);
-              } else {
-                let status;
-                let uptime = '';
-                let PID = path.parse(PFile).name;
-                const pInfo = toml.parse(d);
-                const cPath = pInfo.runtime.configPath;
-                try {
-                  process.kill(PID, 0);
-                  status = `\x1b[42m  on  \x1b[0m`;
-                  uptime = this.parseTime(pInfo.runtime.startTime);
-                } catch(e) {
-                  status = `\x1b[41m off  \x1b[0m`;
-                  PID = `\x1b[90m${PID}\x1b[0m`;
-                  uptime = '\t';
-                }
-
-                resolve([PID, status, uptime, cPath].join('\t'));
-              }
-            });
-          });
-        });
+        .map((PID, i) => this.readProcess({ PID, PIDFolder }));
 
         return Promise.all(jobs)
         .then((d) => {
@@ -212,6 +187,45 @@ class Utils {
         });
       });
     });
+  }
+
+  static readProcess({ PID, PIDFolder }) {
+    return this.readPackageInfo()
+    .then(packageInfo => {
+      const PIDFolder = path.resolve(os.homedir(), packageInfo.name, 'PIDs');
+      const PFile = path.resolve(PIDFolder, `${PID}.toml`);
+      return Promise.resolve(PFile);
+    })
+    .then((PFile) => new Promise((resolve, reject) => {
+      fs.readFile(PFile, (e, d) => {
+        if(e) {
+          reject(e);
+        } else {
+          let status;
+          let uptime = '';
+          const pInfo = toml.parse(d);
+          const cPath = pInfo.runtime.configPath;
+          if(this.testProcess({ PID })) {
+            status = `\x1b[42m  on  \x1b[0m`;
+            uptime = this.parseTime(pInfo.runtime.startTime);
+          } else {
+            status = `\x1b[41m off  \x1b[0m`;
+            PID = `\x1b[90m${PID}\x1b[0m`;
+            uptime = '\t';
+          }
+          resolve([PID, status, uptime, cPath].join('\t'));
+        }
+      });
+    }));
+  }
+
+  static testProcess({ PID }) {
+    try {
+      process.kill(PID, 0);
+      return true;
+    } catch(e) {
+      return false;
+    }
   }
 
   static killProcess({ PID, pause }) {
@@ -234,7 +248,7 @@ class Utils {
     }
     return this.readPackageInfo()
     .then(packageInfo => {
-      const fPID = path.resolve(os.homedir(), packageInfo.name, 'PIDs', `${PID}.log`);
+      const fPID = path.resolve(os.homedir(), packageInfo.name, 'PIDs', `${PID}.toml`);
       return new Promise((resolve, reject) => {
         if(pause) {
           resolve(true);
@@ -285,7 +299,7 @@ class Utils {
 
     return new Promise((resolve, reject) => {
       const PID = process.pid;
-      const pathPID = path.resolve(systemHome, 'PIDs', `${PID}.log`);
+      const pathPID = path.resolve(systemHome, 'PIDs', `${PID}.toml`);
       fs.writeFile(pathPID, processContent, function(e) {
         if(e) {
           reject(e);
@@ -317,7 +331,7 @@ class Utils {
     return new Promise((resolve, reject) => {
       mongodb.connect(dbPath, (e, d) => {
         if(e) {
-          reject(e);
+          resolve(false);
         } else {
           const db = d.db();
           db.close = d.close;
