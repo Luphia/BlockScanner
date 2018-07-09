@@ -27,7 +27,7 @@ class Utils {
       else {
         return new Promise((resolve, reject) => {
           setTimeout(() => {
-            this.retryPromise(promise, args, maxTries - 1, context)
+            this.retryPromise(promise, args, maxTries - 1, context, timeout)
             .then(resolve, reject);
           }, timeout || 0);
         });
