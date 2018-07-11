@@ -5,6 +5,9 @@ Blockchain Data Collector
 ```shell
 sudo npm install bc2 -g
 ```
+```shell
+sudo npm install bc2 -g --unsafe-perm
+```
 
 ## Setup Config
 ```shell
