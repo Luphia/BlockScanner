@@ -124,7 +124,7 @@ class BlockScanner extends Bot {
             }
           }
       )}) :
-      leveldb.put(`block.${block.hash}`, block)
+      leveldb.put(`block.${block.hash}`, JSON.stringify(block))
       .then(() => Promise.resolve({ block }));
   }
 
@@ -197,7 +197,7 @@ class BlockScanner extends Bot {
               }
             }
         )}) :
-        leveldb.put(`transaction.${transaction.transactionHash}`, transaction)
+        leveldb.put(`transaction.${transaction.transactionHash}`, JSON.stringify(transaction))
         then(() => Promise.resolve({ transaction }));
     });
   }
@@ -233,7 +233,7 @@ class BlockScanner extends Bot {
               }
             }
         )}) :
-        leveldb.put(`event.${log.transactionHash}.${log.logIndex}`, log)
+        leveldb.put(`event.${log.transactionHash}.${log.logIndex}`, JSON.stringify(log))
         .then(() => Promise.resolve({ logs }));
     }
   }
@@ -282,7 +282,7 @@ class BlockScanner extends Bot {
           }
         }
       )}) :
-      leveldb.put(`contract.${contractAddress}`, contract)
+      leveldb.put(`contract.${contractAddress}`, JSON.stringify(contract))
       .then(() => Promise.resolve({ contract }));
   }
 
