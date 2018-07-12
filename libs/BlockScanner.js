@@ -33,13 +33,15 @@ class BlockScanner extends Bot {
     // 0. get start block
     // 1. get block info and transaction list
     // 2. write block
-    // 3. get transaction event
+    // 3. get transaction
     // 4. write transaction
-    // 4.1 write events
-    // 4.2 get internal transaction
-    // 4.3 write internal transactions
-    // 5. put BlockNumber
-    // 6. again
+    // 5. get receipt
+    // 6. write receipt
+    // 6.1 write events
+    // 6.2 get internal transaction
+    // 6.3 write internal transactions
+    // 7. put BlockNumber
+    // 8. again
 
     this.initialRound = new Date().getTime();
     return Utils.retryPromise(this.getCurrentBlock, [], 3, this)
@@ -146,14 +148,37 @@ class BlockScanner extends Bot {
     }, Promise.resolve([]))
     */
     return Promise.all(txHashes.map((v) => {
-      return this.getTransaction({ txHash: v })
-      .then((tx) => {
-        const newTx = tx;
-        newTx.timestamp = timestamp;
-        return this.putTransaction({ transaction: newTx });
+      return Promise.all([
+        this.getTransaction({ txHash: v }),
+        this.getReceipt({ txHash: v })
+      ])
+      .then(([ tx, receipt ]) => {
+        const newReceipt = receipt;
+        const newTransaction = tx;
+        newReceipt.timestamp = timestamp;
+        newTransaction.timestamp = timestamp;
+        return Promise.all([
+          this.putTransaction({ transaction: newTransaction }),
+          this.putReceipt({ transaction: newTransaction, receipt: newReceipt })
+        ]);
       })
     }))
     .then(() => Promise.resolve({ block }));
+  }
+
+  getReceipt({ txHash }) {
+    const type = 'receipt';
+    const options = dvalue.clone(this.config.blockchain);
+    options.data = this.constructor.cmd({ type, txHash });
+    return Utils.ETHRPC(options)
+    .then((data) => {
+      if(data.result instanceof Object) {
+        return Promise.resolve(data.result);
+      } else {
+        this.logger.log(`\x1b[1m\x1b[90mreceipt not found\x1b[0m\x1b[21m ${txHash}`);
+        return Promise.reject();
+      }
+    });
   }
 
   getTransaction({ txHash }) {
@@ -169,36 +194,76 @@ class BlockScanner extends Bot {
         return Promise.reject();
       }
     });
+  }  
+
+  getContract({ address }) {
+    const type = 'contract';
+    const options = dvalue.clone(this.config.blockchain);
+    options.data = this.constructor.cmd({ type, address });
+    return Utils.ETHRPC(options)
+    .then((data) => {
+      if(!!data.result) {
+        return Promise.resolve(data.result);
+      } else {
+        this.logger.log(`\x1b[1m\x1b[90mcontract not found\x1b[0m\x1b[21m ${address}`);
+        return Promise.reject();
+      }
+    });
   }
 
   putTransaction({ transaction }) {
-    this.logger.debug(`\x1b[1m\x1b[32mTransaction\x1b[0m\x1b[21m ${transaction.transactionHash}`);
+    this.logger.debug(`\x1b[1m\x1b[32mTransaction\x1b[0m\x1b[21m ${transaction.hash}`);
 
-    const condition = { transactionHash: transaction.transactionHash };
+    const condition = { hash: transaction.hash };
     const mongodb = this.database.mongodb;
     const leveldb = this.database.leveldb;
-    const tableName = `${this.config.database.prefix}Transcations`;
+    const tableName = `${this.config.database.prefix}Transactions`;
+    return mongodb ? 
+      new Promise((resolve, reject) => {
+        mongodb.collection(tableName).update(
+          condition,
+          transaction,
+          { upsert: true },
+          (e, d) => {
+            if(e) {
+              reject(e);
+            } else {
+              resolve({ transaction });
+            }
+          }
+      )}) :
+      leveldb.put(`Transactions.${transaction.hash}`, JSON.stringify(transaction))
+      .then(() => Promise.resolve({ transaction }));
+  }
+
+  putReceipt({ transaction, receipt }) {
+    this.logger.debug(`\x1b[1m\x1b[32mReceipt\x1b[0m\x1b[21m ${receipt.transactionHash}`);
+
+    const condition = { transactionHash: receipt.transactionHash };
+    const mongodb = this.database.mongodb;
+    const leveldb = this.database.leveldb;
+    const tableName = `${this.config.database.prefix}Receipts`;
     return Promise.all([
-      this.putEvent(transaction),
-      this.putContract(transaction),
-      this.putInternalTranction(transaction)
+      this.putEvent(receipt),
+      this.putContract({ transaction, receipt }),
+      this.putInternalTranction(receipt)
     ]).then(() => {
       return mongodb ? 
         new Promise((resolve, reject) => {
           mongodb.collection(tableName).update(
             condition,
-            transaction,
+            receipt,
             { upsert: true },
             (e, d) => {
               if(e) {
                 reject(e);
               } else {
-                resolve({ transaction });
+                resolve({ receipt });
               }
             }
         )}) :
-        leveldb.put(`transaction.${transaction.transactionHash}`, JSON.stringify(transaction))
-        then(() => Promise.resolve({ transaction }));
+        leveldb.put(`Receipts.${receipt.transactionHash}`, JSON.stringify(receipt))
+        .then(() => Promise.resolve({ receipt }));
     });
   }
 
@@ -218,7 +283,6 @@ class BlockScanner extends Bot {
       const mongodb = this.database.mongodb;
       const leveldb = this.database.leveldb;
       const tableName = `${this.config.database.prefix}Events`;
-
       return mongodb ? 
         new Promise((resolve, reject) => {
           mongodb.collection(tableName).update(
@@ -233,57 +297,50 @@ class BlockScanner extends Bot {
               }
             }
         )}) :
-        leveldb.put(`event.${log.transactionHash}.${log.logIndex}`, JSON.stringify(log))
+        leveldb.put(`Events.${log.transactionHash}.${log.logIndex}`, JSON.stringify(log))
         .then(() => Promise.resolve({ logs }));
     }
   }
 
   putContract({
-    blockHash,
-    blockNumber,
-    contractAddress,
-    cumulativeGasUsed,
-    from,
-    gasUsed,
-    status,
-    to,
-    transactionHash,
-    timestamp
+    transaction,
+    receipt
   }) {
+    const contractAddress = receipt.contractAddress;
     if(!contractAddress) { return Promise.resolve({}); }
     this.logger.log(`\x1b[1m\x1b[32mContract\x1b[0m\x1b[21m ${contractAddress}`);
-    const condition = { contractAddress };
-    const contract = {
-      blockHash,
-      blockNumber,
-      contractAddress,
-      cumulativeGasUsed,
-      from,
-      gasUsed,
-      status,
-      to,
-      transactionHash,
-      timestamp
-    };
-    const mongodb = this.database.mongodb;
-    const leveldb = this.database.leveldb;
-    const tableName = `${this.config.database.prefix}Contracts`;
-    return mongodb ?
-    new Promise((resolve, reject) => {
-      mongodb.collection(tableName).update(
-        condition,
-        contract,
-        { upsert: true },
-        (e, d) => {
-          if(e) {
-            reject(e);
-          } else {
-            resolve({ contract });
+    this.getContract({ address: contractAddress }).then((code) => {
+      const condition = { contractAddress };
+      const contract = {
+        blockNumber: receipt.blockNumber,
+        contractAddress: receipt.contractAddress,
+        cumulativeGasUsed: receipt.cumulativeGasUsed,
+        from: transaction.from,
+        gasUsed: receipt.gasUsed,
+        transactionHash: receipt.transactionHash,
+        timestamp: receipt.timestamp,
+        code
+      };
+      const mongodb = this.database.mongodb;
+      const leveldb = this.database.leveldb;
+      const tableName = `${this.config.database.prefix}Contracts`;
+      return mongodb ?
+      new Promise((resolve, reject) => {
+        mongodb.collection(tableName).update(
+          condition,
+          contract,
+          { upsert: true },
+          (e, d) => {
+            if(e) {
+              reject(e);
+            } else {
+              resolve({ contract });
+            }
           }
-        }
-      )}) :
-      leveldb.put(`contract.${contractAddress}`, JSON.stringify(contract))
-      .then(() => Promise.resolve({ contract }));
+        )}) :
+        leveldb.put(`Contracts.${contractAddress}`, JSON.stringify(contract))
+        .then(() => Promise.resolve({ contract }));
+    })
   }
 
   putInternalTranction({ transactionHash }) {
@@ -303,7 +360,7 @@ class BlockScanner extends Bot {
     .catch(() => Promise.resolve(true));
   }
 
-  static cmd({ type, txHash, block }) {
+  static cmd({ type, txHash, block, address }) {
     let result;
     switch(type) {
       case 'block':
@@ -317,6 +374,14 @@ class BlockScanner extends Bot {
       case 'transaction':
         result = {
           "jsonrpc": "2.0",
+          "method": "eth_getTransactionByHash",
+          "params": [ txHash ],
+          "id": dvalue.randomID()
+        };
+        break;
+      case 'receipt':
+        result = {
+          "jsonrpc": "2.0",
           "method": "eth_getTransactionReceipt",
           "params": [ txHash ],
           "id": dvalue.randomID()
@@ -327,6 +392,14 @@ class BlockScanner extends Bot {
           "jsonrpc": "2.0",
           "method": "trace_transaction",
           "params": [ txHash ],
+          "id": dvalue.randomID()
+        };
+        break;
+      case 'contract':
+        result = {
+          "jsonrpc":"2.0",
+          "method":"eth_getCode",
+          "params":[ address ],
           "id": dvalue.randomID()
         };
         break;
