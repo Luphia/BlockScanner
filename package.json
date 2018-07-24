@@ -1,6 +1,6 @@
 {
   "name": "bc2",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Blockchain Data Collector",
   "main": "bin/start.js",
   "bin": {

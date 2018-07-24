@@ -156,7 +156,9 @@ class BlockScanner extends Bot {
         const newReceipt = receipt;
         const newTransaction = tx;
         newReceipt.timestamp = timestamp;
+        newReceipt.blockNumber = parseInt(receipt.blockNumber);
         newTransaction.timestamp = timestamp;
+        newTransaction.blockNumber = parseInt(receipt.blockNumber);
         return Promise.all([
           this.putTransaction({ transaction: newTransaction }),
           this.putReceipt({ transaction: newTransaction, receipt: newReceipt })
@@ -274,6 +276,7 @@ class BlockScanner extends Bot {
       this.logger.debug(`  \x1b[1m\x1b[36mEvent\x1b[0m\x1b[21m ${logs.logIndex} - ${logs.topics[0] || logs.topics}`);
 
       const log = logs;
+      log.blockNumber = parseInt(logs.blockNumber);
       log.timestamp = timestamp;
 
       const condition = {
@@ -312,7 +315,7 @@ class BlockScanner extends Bot {
     this.getContract({ address: contractAddress }).then((code) => {
       const condition = { contractAddress };
       const contract = {
-        blockNumber: receipt.blockNumber,
+        blockNumber: parseInt(receipt.blockNumber),
         contractAddress: receipt.contractAddress,
         cumulativeGasUsed: receipt.cumulativeGasUsed,
         from: transaction.from,
