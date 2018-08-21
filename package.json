@@ -1,6 +1,6 @@
 {
   "name": "bc2",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Blockchain Data Collector",
   "main": "bin/start.js",
   "bin": {
@@ -32,7 +32,7 @@
     "koa-body": "^4.0.4",
     "koa-router": "^7.4.0",
     "level": "^4.0.0",
-    "mongodb": "^3.0.10",
+    "mongodb": "^3.1.3",
     "pem": "^1.12.5",
     "spdy": "^3.4.7",
     "toml": "^2.3.3"
