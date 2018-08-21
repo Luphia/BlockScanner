@@ -27,7 +27,6 @@ class Receptor extends Bot {
   }
 
   start() {
-  	const uploadDir = path.resolve(this.config.uploadFolder)
     return super.start()
     .then(() => this.createPem())
     .then((options) => {
