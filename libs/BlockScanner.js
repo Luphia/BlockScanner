@@ -409,6 +409,12 @@ class BlockScanner extends Bot {
     }
     return result;
   }
+
+  jsonrpc({ body, files, params, header, method, query }) {
+    const options = dvalue.clone(this.config.blockchain);
+    options.data = body;
+    return Utils.ETHRPC(options);
+  }
 }
 
 module.exports = BlockScanner;

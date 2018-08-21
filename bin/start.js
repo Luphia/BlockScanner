@@ -66,7 +66,7 @@ Utils.readConfig({ configPath: cfg })
     .then((options) => Utils.initialBots(options))
     .then((Bots) => Utils.startBots({ Bots }))
     .catch((e) => { console.trace(e); })
-    .then((Bots) => Utils.close({ Bots }));
+    //.then((Bots) => Utils.close({ Bots }));
   }
 })
 
