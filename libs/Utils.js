@@ -47,6 +47,12 @@ class Utils {
     return s;
   }
 
+  static parseBoolean(bool) {
+    return typeof(bool) == 'string' ?
+      bool.toLowerCase() != 'false' :
+      !!bool;
+  }
+
   static parseTime(timestamp) {
     let result;
     const uptime = new Date().getTime() - timestamp;
@@ -105,8 +111,10 @@ class Utils {
     return this.readConfig({ configPath: cfg })
     .then((config) => {
       const rsConfig = config;
+      // const uploadFolder = path.resolve(config.homeFolder, 'uploads');
       rsConfig.argv = arguments[0];
       return this.initialFolder(config)
+      // .then(() => this.initialFolder({ homeFolder: config.uploadFolder }))
       .then(() => rsConfig);
     })
     .then((config) => Promise.all([
@@ -147,6 +155,7 @@ class Utils {
             config.homeFolder = config.base.folder ?
               path.resolve(basePath, config.base.folder) :
               basePath;
+            // config.uploadFolder = path.resolve(basePath, 'uploads');
             return resolve(config);
           }
         });

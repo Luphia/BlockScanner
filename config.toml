@@ -20,3 +20,9 @@ db = "CHAINDATA"
 prefix = "BS_"
 user = "BC2"
 password = "password"
+
+[api]
+pathname = [
+  "get|/version|Static.Utils.readPackageInfo",
+  "get|/test/:go|Bot.BlockScanner.test|auth|hashcash"
+]
