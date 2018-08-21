@@ -326,6 +326,9 @@ class Utils {
   }
 
   static initialDB({ database }) {
+    if(Object.keys(database).length == 0) {
+      return Promise.resolve(false);
+    }
     let dbPath;
     let dbConfig = database;
     dbConfig.pathname = `/${database.db}`;
@@ -338,7 +341,7 @@ class Utils {
       dbPath = url.format(database);
     }
     return new Promise((resolve, reject) => {
-      mongodb.connect(dbPath, (e, d) => {
+      mongodb.connect(dbPath, { useNewUrlParser: true }, (e, d) => {
         if(e) {
           resolve(false);
         } else {
